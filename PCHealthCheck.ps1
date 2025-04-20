@@ -1,164 +1,135 @@
-# Advanced PC Health Check Script
-# Version: 2.0
-# Description: Comprehensive system diagnostics tool compatible with PowerShell 5
+# Enhanced PC Health Check Script
+# Compatible with PowerShell 5.x
 
-param (
-    [switch]$LogToFile = $false,
-    [string]$LogPath = "$env:USERPROFILE\Documents\PCHealthChecks",
-    [switch]$Silent = $false
-)
+# Define log file path
+$logFilePath = "$([Environment]::GetFolderPath('Desktop'))\PCHealthChecks"
+$logFile = "$logFilePath\PCHealthCheck_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
 
-# Create log directory if it doesn't exist
-if ($LogToFile -and -not (Test-Path $LogPath)) {
-    try {
-        New-Item -Path $LogPath -ItemType Directory -Force | Out-Null
-        Write-Host "Created log directory: $LogPath" -ForegroundColor Cyan
-    }
-    catch {
-        Write-Host "Error creating log directory: $_" -ForegroundColor Red
-        $LogToFile = $false
-    }
-}
-
-# Log file setup
-$logFileName = "PCHealthCheck_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
-$logFilePath = Join-Path -Path $LogPath -ChildPath $logFileName
-
-# Function to write to both console and log file
-function Write-Log {
+# Define functions first
+function Write-ColorOutput {
     param (
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory=$true)]
         [string]$Message,
         
-        [Parameter(Mandatory = $false)]
+        [Parameter(Mandatory=$false)]
         [string]$ForegroundColor = "White"
     )
     
-    if (-not $Silent) {
-        Write-Host $Message -ForegroundColor $ForegroundColor
-    }
-    
-    if ($LogToFile) {
-        $timeStamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-        "$timeStamp - $Message" | Out-File -FilePath $logFilePath -Append
-    }
+    Write-Host $Message -ForegroundColor $ForegroundColor
+    Add-ToLog $Message
 }
 
-# Error handling wrapper
-function Invoke-WithErrorHandling {
+function Add-ToLog {
     param (
-        [Parameter(Mandatory = $true)]
-        [scriptblock]$ScriptBlock,
-        
-        [Parameter(Mandatory = $true)]
-        [string]$ErrorMessage
+        [Parameter(Mandatory=$true)]
+        [string]$Message
     )
     
-    try {
-        & $ScriptBlock
-        return $true
+    # Ensure log directory exists
+    if (-not (Test-Path -Path $logFilePath)) {
+        New-Item -Path $logFilePath -ItemType Directory -Force | Out-Null
     }
-    catch {
-        Write-Log "ERROR: $ErrorMessage - $_" -ForegroundColor Red
-        return $false
-    }
+    
+    # Add timestamp and append message to log file
+    $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    "$timestamp - $Message" | Out-File -FilePath $logFile -Append
 }
 
 function Show-Banner {
     Clear-Host
-    Write-Log "===============================================" -ForegroundColor Cyan
-    Write-Log "           ADVANCED PC HEALTH CHECK            " -ForegroundColor Cyan
-    Write-Log "===============================================" -ForegroundColor Cyan
-    Write-Log "System: $($env:COMPUTERNAME)" -ForegroundColor Cyan
-    Write-Log "User: $($env:USERNAME)" -ForegroundColor Cyan
-    Write-Log "Date: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor Cyan
-    Write-Log "===============================================" -ForegroundColor Cyan
-    if ($LogToFile) {
-        Write-Log "Logging to: $logFilePath" -ForegroundColor Cyan
-    }
+    Write-ColorOutput "=======================================" "Cyan"
+    Write-ColorOutput "        ENHANCED PC HEALTH CHECK       " "Cyan"
+    Write-ColorOutput "=======================================" "Cyan"
+    Write-ColorOutput "System: $($env:COMPUTERNAME)" "Cyan"
+    Write-ColorOutput "User: $($env:USERNAME)" "Cyan"
+    Write-ColorOutput "Date: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" "Cyan"
+    Write-ColorOutput "Log File: $logFile" "Cyan"
+    Write-ColorOutput "=======================================" "Cyan"
 }
 
 function Show-Menu {
-    Write-Log "`nSelect an option:" -ForegroundColor Yellow
-    Write-Log "1. Check Disk Space" -ForegroundColor White
-    Write-Log "2. Check CPU Usage (Multiple Samples)" -ForegroundColor White
-    Write-Log "3. Check Memory Usage" -ForegroundColor White
-    Write-Log "4. Test Network Connectivity" -ForegroundColor White
-    Write-Log "5. Check for Port Exhaustion" -ForegroundColor White
-    Write-Log "6. Check System Uptime" -ForegroundColor White
-    Write-Log "7. List Top Processes by Memory" -ForegroundColor White
-    Write-Log "8. List Top Processes by CPU" -ForegroundColor White
-    Write-Log "9. Check Windows Services Status" -ForegroundColor White
-    Write-Log "10. Run All Checks" -ForegroundColor Green
-    Write-Log "H. Help" -ForegroundColor Magenta
-    Write-Log "Q. Quit" -ForegroundColor Red
+    Write-ColorOutput "`nSelect an option:" "Yellow"
+    Write-ColorOutput "1. Check Disk Space" "White"
+    Write-ColorOutput "2. Check CPU Usage" "White"
+    Write-ColorOutput "3. Check Memory Usage" "White"
+    Write-ColorOutput "4. Test Network Connectivity" "White"
+    Write-ColorOutput "5. Check for Port Exhaustion" "White"
+    Write-ColorOutput "6. Check System Uptime" "White"
+    Write-ColorOutput "7. List Top Processes by Memory" "White"
+    Write-ColorOutput "8. List Top Processes by CPU" "White"
+    Write-ColorOutput "9. Check Windows Services Status" "White"
+    Write-ColorOutput "10. Scan Windows Event Logs" "White"
+    Write-ColorOutput "11. Check Windows Update Status" "White"
+    Write-ColorOutput "12. Run All Checks" "Green"
+    Write-ColorOutput "H. Help" "Cyan"
+    Write-ColorOutput "Q. Quit" "Red"
 }
 
 function Get-DiskSpace {
-    Write-Log "`nChecking Disk Space..." -ForegroundColor Yellow
+    Write-ColorOutput "`nChecking Disk Space..." "Yellow"
     
-    Invoke-WithErrorHandling -ScriptBlock {
+    try {
         $disks = Get-PSDrive -PSProvider FileSystem | 
-                Select-Object Name, @{Name="FreeSpace(GB)";Expression={[math]::Round($_.Free/1GB,2)}}, 
-                @{Name="TotalSpace(GB)";Expression={[math]::Round(($_.Used/1GB + $_.Free/1GB),2)}},
-                @{Name="UsedSpace(GB)";Expression={[math]::Round($_.Used/1GB,2)}},
-                @{Name="PercentFree";Expression={[math]::Round(($_.Free/($_.Used + $_.Free))*100,2)}}
+                Select-Object Name, @{Name="FreeSpace(GB)";Expression={[math]::Round($_.Free/1GB, 2)}}, 
+                @{Name="TotalSpace(GB)";Expression={[math]::Round(($_.Used/1GB + $_.Free/1GB), 2)}},
+                @{Name="PercentFree";Expression={[math]::Round(($_.Free/($_.Used + $_.Free))*100, 2)}}
         
         foreach ($disk in $disks) {
             $color = "Green"
             if ($disk."PercentFree" -lt 20) { $color = "Yellow" }
             if ($disk."PercentFree" -lt 10) { $color = "Red" }
             
-            Write-Log "Drive $($disk.Name): $($disk.'FreeSpace(GB)') GB free of $($disk.'TotalSpace(GB)') GB ($($disk.PercentFree)% free)" -ForegroundColor $color
+            Write-ColorOutput "Drive $($disk.Name): $($disk.'FreeSpace(GB)') GB free of $($disk.'TotalSpace(GB)') GB ($($disk.PercentFree)% free)" $color
         }
-        
-        return $disks
-    } -ErrorMessage "Failed to retrieve disk space information"
+    }
+    catch {
+        Write-ColorOutput "Error checking disk space: $_" "Red"
+    }
 }
 
 function Get-CPUUsage {
-    Write-Log "`nChecking CPU Usage (5 samples over 10 seconds)..." -ForegroundColor Yellow
+    Write-ColorOutput "`nChecking CPU Usage..." "Yellow"
     
-    Invoke-WithErrorHandling -ScriptBlock {
+    try {
+        Write-ColorOutput "Taking 5 CPU utilization samples..." "Gray"
         $samples = @()
-        $totalSamples = 5
-        $sampleDelay = 2
         
-        for ($i = 0; $i -lt $totalSamples; $i++) {
+        for ($i = 1; $i -le 5; $i++) {
             $counterData = Get-Counter -Counter "\Processor(_Total)\% Processor Time" -ErrorAction Stop
             $cpuValue = [math]::Round($counterData.CounterSamples.CookedValue, 2)
             $samples += $cpuValue
             
-            if ($i -lt ($totalSamples - 1)) {
-                Write-Log "Sample $($i+1) of $totalSamples : $cpuValue% CPU usage" -ForegroundColor Gray
-                Start-Sleep -Seconds $sampleDelay
-            }
-            else {
-                Write-Log "Sample $($i+1) of $totalSamples : $cpuValue% CPU usage" -ForegroundColor Gray
-            }
+            Write-ColorOutput "  Sample $i of 5: $cpuValue%" "Gray"
+            Start-Sleep -Seconds 1
         }
         
-        $avgCPU = [math]::Round(($samples | Measure-Object -Average).Average, 2)
-        $maxCPU = [math]::Round(($samples | Measure-Object -Maximum).Maximum, 2)
+        # Calculate average CPU usage
+        $avgCpu = ($samples | Measure-Object -Average).Average
+        $avgCpu = [math]::Round($avgCpu, 2)
         
+        # Calculate min and max values
+        $minCpu = ($samples | Measure-Object -Minimum).Minimum
+        $maxCpu = ($samples | Measure-Object -Maximum).Maximum
+        
+        # Set color based on average CPU usage
         $color = "Green"
-        if ($avgCPU -gt 70) { $color = "Yellow" }
-        if ($avgCPU -gt 90) { $color = "Red" }
+        if ($avgCpu -gt 70) { $color = "Yellow" }
+        if ($avgCpu -gt 90) { $color = "Red" }
         
-        Write-Log "Average CPU Usage: $avgCPU% (Max: $maxCPU%)" -ForegroundColor $color
-        
-        return [PSCustomObject]@{
-            AverageCPU = $avgCPU
-            MaximumCPU = $maxCPU
-            Samples = $samples
-        }
-    } -ErrorMessage "Failed to retrieve CPU usage information"
+        Write-ColorOutput "`nCPU Usage Results:" "White"
+        Write-ColorOutput "  Average: $avgCpu%" $color
+        Write-ColorOutput "  Minimum: $minCpu%" "Gray"
+        Write-ColorOutput "  Maximum: $maxCpu%" "Gray"
+    }
+    catch {
+        Write-ColorOutput "Error checking CPU usage: $_" "Red"
+    }
 }
 
 function Get-MemoryUsage {
-    Write-Log "`nChecking Memory Usage..." -ForegroundColor Yellow
+    Write-ColorOutput "`nChecking Memory Usage..." "Yellow"
     
-    Invoke-WithErrorHandling -ScriptBlock {
+    try {
         $os = Get-WmiObject -Class Win32_OperatingSystem -ErrorAction Stop
         $totalMemoryGB = [math]::Round($os.TotalVisibleMemorySize / 1MB, 2)
         $freeMemoryGB = [math]::Round($os.FreePhysicalMemory / 1MB, 2)
@@ -169,118 +140,72 @@ function Get-MemoryUsage {
         if ($percentUsed -gt 70) { $color = "Yellow" }
         if ($percentUsed -gt 90) { $color = "Red" }
         
-        Write-Log "Total Memory: $totalMemoryGB GB" -ForegroundColor White
-        Write-Log "Used Memory: $usedMemoryGB GB ($percentUsed%)" -ForegroundColor $color
-        Write-Log "Free Memory: $freeMemoryGB GB" -ForegroundColor White
-        
-        return [PSCustomObject]@{
-            TotalMemoryGB = $totalMemoryGB
-            FreeMemoryGB = $freeMemoryGB
-            UsedMemoryGB = $usedMemoryGB
-            PercentUsed = $percentUsed
-        }
-    } -ErrorMessage "Failed to retrieve memory usage information"
+        Write-ColorOutput "Total Memory: $totalMemoryGB GB" "White"
+        Write-ColorOutput "Used Memory: $usedMemoryGB GB ($percentUsed%)" $color
+        Write-ColorOutput "Free Memory: $freeMemoryGB GB" "White"
+    }
+    catch {
+        Write-ColorOutput "Error checking memory usage: $_" "Red"
+    }
 }
 
 function Test-NetworkConnectivity {
-    Write-Log "`nTesting Network Connectivity..." -ForegroundColor Yellow
+    Write-ColorOutput "`nTesting Network Connectivity..." "Yellow"
     
     $hosts = @("google.com", "microsoft.com", "1.1.1.1")
-    $results = @()
     
     foreach ($targetHost in $hosts) {
-        Write-Log "Testing connection to $targetHost..." -ForegroundColor Gray
+        Write-ColorOutput "Testing connection to $targetHost..." "Gray"
         
-        $pingResult = Invoke-WithErrorHandling -ScriptBlock {
+        try {
             $ping = Test-Connection -ComputerName $targetHost -Count 4 -ErrorAction Stop
-            $avgTime = [math]::Round(($ping | Measure-Object -Property ResponseTime -Average).Average, 2)
-            $packetLoss = 100 - ([math]::Round(($ping.Count / 4) * 100, 0))
+            $pingStats = $ping | Measure-Object -Property ResponseTime -Average -Maximum -Minimum
+            $avgTime = [math]::Round($pingStats.Average, 2)
             
             $color = "Green"
             if ($avgTime -gt 100) { $color = "Yellow" }
-            if ($avgTime -gt 200 -or $packetLoss -gt 0) { $color = "Red" }
+            if ($avgTime -gt 200) { $color = "Red" }
             
-            Write-Log "  Response from $targetHost - Avg time: $avgTime ms, Packet Loss: $packetLoss%" -ForegroundColor $color
-            
-            return [PSCustomObject]@{
-                Target = $targetHost
-                AverageResponseTime = $avgTime
-                PacketLoss = $packetLoss
-                Success = $true
-            }
-        } -ErrorMessage "Failed to ping $targetHost"
-        
-        if (-not $pingResult) {
-            $results += [PSCustomObject]@{
-                Target = $targetHost
-                AverageResponseTime = 0
-                PacketLoss = 100
-                Success = $false
-            }
+            Write-ColorOutput "  Response from $targetHost - Avg time: $avgTime ms" $color
         }
-        else {
-            $results += $pingResult
+        catch {
+            Write-ColorOutput "  Failed to ping $targetHost`: $_" "Red"
         }
     }
-    
-    # Internet connectivity summary
-    $successfulPings = ($results | Where-Object { $_.Success -eq $true }).Count
-    if ($successfulPings -eq $hosts.Count) {
-        Write-Log "Network Status: ONLINE (All hosts reachable)" -ForegroundColor Green
-    }
-    elseif ($successfulPings -gt 0) {
-        Write-Log "Network Status: DEGRADED (Some hosts unreachable)" -ForegroundColor Yellow
-    }
-    else {
-        Write-Log "Network Status: OFFLINE (No hosts reachable)" -ForegroundColor Red
-    }
-    
-    return $results
 }
 
 function Test-PortExhaustion {
-    Write-Log "`nChecking for Port Exhaustion..." -ForegroundColor Yellow
+    Write-ColorOutput "`nChecking for Port Exhaustion..." "Yellow"
     
-    Invoke-WithErrorHandling -ScriptBlock {
-        # PS5 compatible way to get TCP connections
-        $establishedCount = 0
-        $timeWaitCount = 0
-        $totalConnections = 0
-        
+    try {
         # Using netstat as it's available on all Windows versions with PS5
-        $netstat = netstat -ano | Out-String
-        $connections = $netstat -split "`r`n" | Where-Object { $_ -match "(TCP|UDP)" }
-        $totalConnections = $connections.Count
+        $netstatOutput = netstat -ano | Out-String
+        $connections = $netstatOutput -split "`r`n" | Where-Object { $_ -match "(TCP|UDP)" }
         
         # Count established connections
-        $establishedCount = ($connections | Where-Object { $_ -match "ESTABLISHED" }).Count
-        $timeWaitCount = ($connections | Where-Object { $_ -match "TIME_WAIT" }).Count
+        $establishedConnections = @($connections | Where-Object { $_ -match "ESTABLISHED" })
+        $establishedCount = $establishedConnections.Count
         
         $color = "Green"
         if ($establishedCount -gt 8000) { $color = "Yellow" }
         if ($establishedCount -gt 16000) { $color = "Red" }
         
-        Write-Log "Established connections: $establishedCount" -ForegroundColor $color
-        Write-Log "Time Wait connections: $timeWaitCount" -ForegroundColor White
-        Write-Log "Total connections: $totalConnections" -ForegroundColor White
+        Write-ColorOutput "Established connections: $establishedCount" $color
+        Write-ColorOutput "Total connections: $($connections.Count)" "White"
         
         if ($establishedCount -gt 16000) {
-            Write-Log "WARNING: High number of connections detected. Port exhaustion may occur!" -ForegroundColor Red
+            Write-ColorOutput "WARNING: High number of connections detected. Port exhaustion may occur!" "Red"
         }
-        
-        return [PSCustomObject]@{
-            EstablishedConnections = $establishedCount
-            TimeWaitConnections = $timeWaitCount
-            TotalConnections = $totalConnections
-        }
-    } -ErrorMessage "Failed to retrieve network connection information"
+    }
+    catch {
+        Write-ColorOutput "Error checking port exhaustion: $_" "Red"
+    }
 }
 
 function Get-SystemUptime {
-    Write-Log "`nChecking System Uptime..." -ForegroundColor Yellow
+    Write-ColorOutput "`nChecking System Uptime..." "Yellow"
     
-    Invoke-WithErrorHandling -ScriptBlock {
-        # PowerShell 5 compatible uptime calculation
+    try {
         $bootUpTime = (Get-WmiObject -Class Win32_OperatingSystem -ErrorAction Stop).LastBootUpTime
         
         # Parse WMI datetime format (yyyyMMddHHmmss.mmmmmm+UUU)
@@ -297,58 +222,54 @@ function Get-SystemUptime {
         $formattedUptime = "{0} days, {1} hours, {2} minutes, {3} seconds" -f `
             $uptime.Days, $uptime.Hours, $uptime.Minutes, $uptime.Seconds
         
-        Write-Log "System Last Boot: $($lastBootTime.ToString('yyyy-MM-dd HH:mm:ss'))" -ForegroundColor White
-        Write-Log "System Uptime: $formattedUptime" -ForegroundColor White
-        
-        return [PSCustomObject]@{
-            LastBootTime = $lastBootTime
-            UptimeDays = $uptime.Days
-            UptimeHours = $uptime.Hours
-            UptimeMinutes = $uptime.Minutes
-            UptimeSeconds = $uptime.Seconds
-            FormattedUptime = $formattedUptime
-        }
-    } -ErrorMessage "Failed to retrieve system uptime information"
+        Write-ColorOutput "System Last Boot: $($lastBootTime.ToString('yyyy-MM-dd HH:mm:ss'))" "White"
+        Write-ColorOutput "System Uptime: $formattedUptime" "White"
+    }
+    catch {
+        Write-ColorOutput "Error checking system uptime: $_" "Red"
+    }
 }
 
 function Get-TopProcessesByMemory {
-    Write-Log "`nGetting Top Processes by Memory Usage..." -ForegroundColor Yellow
+    Write-ColorOutput "`nGetting Top Processes by Memory Usage..." "Yellow"
     
-    Invoke-WithErrorHandling -ScriptBlock {
+    try {
         $processes = Get-Process | 
                     Sort-Object -Property WorkingSet -Descending | 
                     Select-Object -First 10 -Property Id, ProcessName, @{Name="Memory(MB)";Expression={[math]::Round($_.WorkingSet / 1MB, 2)}}
         
         $counter = 1
         foreach ($process in $processes) {
-            Write-Log "$counter. $($process.ProcessName) (PID: $($process.Id)) - $($process.'Memory(MB)') MB" -ForegroundColor White
+            Write-ColorOutput "$counter. $($process.ProcessName) (PID: $($process.Id)) - $($process.'Memory(MB)') MB" "White"
             $counter++
         }
-        
-        return $processes
-    } -ErrorMessage "Failed to retrieve top memory consuming processes"
+    }
+    catch {
+        Write-ColorOutput "Error getting top memory processes: $_" "Red"
+    }
 }
 
 function Get-TopProcessesByCPU {
-    Write-Log "`nGetting Top Processes by CPU Usage..." -ForegroundColor Yellow
+    Write-ColorOutput "`nGetting Top Processes by CPU Usage..." "Yellow"
     
-    Invoke-WithErrorHandling -ScriptBlock {
+    try {
         $processes = Get-Process | 
                     Sort-Object -Property CPU -Descending | 
                     Select-Object -First 10 -Property Id, ProcessName, @{Name="CPU(s)";Expression={[math]::Round($_.CPU, 2)}}
         
         $counter = 1
         foreach ($process in $processes) {
-            Write-Log "$counter. $($process.ProcessName) (PID: $($process.Id)) - $($process.'CPU(s)') CPU seconds" -ForegroundColor White
+            Write-ColorOutput "$counter. $($process.ProcessName) (PID: $($process.Id)) - $($process.'CPU(s)') CPU seconds" "White"
             $counter++
         }
-        
-        return $processes
-    } -ErrorMessage "Failed to retrieve top CPU consuming processes"
+    }
+    catch {
+        Write-ColorOutput "Error getting top CPU processes: $_" "Red"
+    }
 }
 
 function Get-ServicesStatus {
-    Write-Log "`nChecking Critical Windows Services..." -ForegroundColor Yellow
+    Write-ColorOutput "`nChecking Critical Windows Services..." "Yellow"
     
     $criticalServices = @(
         "wuauserv",      # Windows Update
@@ -363,136 +284,190 @@ function Get-ServicesStatus {
         "eventlog"       # Windows Event Log
     )
     
-    $results = @()
-    
     foreach ($serviceName in $criticalServices) {
-        Invoke-WithErrorHandling -ScriptBlock {
+        try {
             $service = Get-Service -Name $serviceName -ErrorAction Stop
             
             $color = "Green"
             if ($service.Status -ne "Running") { $color = "Red" }
             
-            Write-Log "$($service.DisplayName): $($service.Status)" -ForegroundColor $color
-            
-            $results += [PSCustomObject]@{
-                Name = $service.Name
-                DisplayName = $service.DisplayName
-                Status = $service.Status
-            }
-        } -ErrorMessage "Failed to retrieve status for service $serviceName"
+            Write-ColorOutput "$($service.DisplayName): $($service.Status)" $color
+        }
+        catch {
+            Write-ColorOutput "Error checking service $serviceName" "Red"
+        }
     }
-    
-    return $results
 }
 
-function Run-AllChecks {
-    Write-Log "`n===== Running All System Checks =====" -ForegroundColor Cyan
+function Get-EventLogErrors {
+    Write-ColorOutput "`nScanning Windows Event Logs for errors (past 24 hours)..." "Yellow"
     
-    # Run all check functions
-    $diskSpace = Get-DiskSpace
-    Start-Sleep -Seconds 1
+    $startTime = (Get-Date).AddHours(-24)
+    $criticalLogs = @("System", "Application")
+    $errorCount = 0
     
-    $memoryUsage = Get-MemoryUsage
-    Start-Sleep -Seconds 1
+    foreach ($logName in $criticalLogs) {
+        Write-ColorOutput "Scanning $logName log..." "Gray"
+        
+        try {
+            $errors = Get-EventLog -LogName $logName -EntryType Error -After $startTime -ErrorAction SilentlyContinue
+            if ($errors -and $errors.Count -gt 0) {
+                $errorCount += $errors.Count
+                $topErrors = $errors | Group-Object -Property Source | Sort-Object -Property Count -Descending | Select-Object -First 3
+                
+                foreach ($errorGroup in $topErrors) {
+                    $latestError = $errors | Where-Object { $_.Source -eq $errorGroup.Name } | Sort-Object -Property TimeGenerated -Descending | Select-Object -First 1
+                    $messagePreview = if ($latestError.Message.Length -gt 100) { $latestError.Message.Substring(0, 97) + "..." } else { $latestError.Message }
+                    
+                    Write-ColorOutput "[$logName] $($errorGroup.Name) (EventID: $($latestError.EventID)): $($errorGroup.Count) occurrences" "Red"
+                    Write-ColorOutput "   Last occurred: $($latestError.TimeGenerated)" "Gray"
+                    Write-ColorOutput "   $messagePreview" "Gray"
+                }
+            }
+        }
+        catch {
+            Write-ColorOutput "  Unable to retrieve events from $logName log: $_" "Yellow"
+        }
+    }
     
-    $cpuUsage = Get-CPUUsage
-    Start-Sleep -Seconds 1
-    
-    $networkStatus = Test-NetworkConnectivity
-    Start-Sleep -Seconds 1
-    
-    $portStatus = Test-PortExhaustion
-    Start-Sleep -Seconds 1
-    
-    $uptime = Get-SystemUptime
-    Start-Sleep -Seconds 1
-    
-    $servicesStatus = Get-ServicesStatus
-    
-    # Generate system health summary
-    Write-Log "`n===== System Health Summary =====" -ForegroundColor Cyan
-    
-    # Disk space check
-    $lowDiskDrives = $diskSpace | Where-Object { $_.PercentFree -lt 15 }
-    if ($lowDiskDrives) {
-        $driveList = ($lowDiskDrives | ForEach-Object { $_.Name }) -join ", "
-        Write-Log "! LOW DISK SPACE: Drives $driveList have less than 15% free space" -ForegroundColor Red
+    # Display summary count
+    if ($errorCount -gt 0) {
+        Write-ColorOutput "Found $errorCount Error events in the past 24 hours" "Red"
     }
     else {
-        Write-Log "+ Disk Space: All drives have sufficient free space" -ForegroundColor Green
+        Write-ColorOutput "No Error events found in the past 24 hours" "Green"
     }
+}
+
+function Get-WindowsUpdateStatus {
+    Write-ColorOutput "`nChecking Windows Update Status..." "Yellow"
     
-    # Memory check
-    if ($memoryUsage.PercentUsed -gt 90) {
-        Write-Log "! HIGH MEMORY USAGE: $($memoryUsage.PercentUsed)% of memory is in use" -ForegroundColor Red
+    # Get update service status
+    try {
+        $wuauserv = Get-Service -Name "wuauserv" -ErrorAction SilentlyContinue
+        
+        if ($wuauserv) {
+            $color = "Green"
+            if ($wuauserv.Status -ne "Running") { $color = "Red" }
+            
+            Write-ColorOutput "Windows Update Service: $($wuauserv.Status)" $color
+            
+            if ($wuauserv.Status -ne "Running") {
+                Write-ColorOutput "WARNING: Windows Update service is not running!" "Red"
+            }
+        }
+        else {
+            Write-ColorOutput "Windows Update Service: Status unknown" "Red"
+        }
+        
+        # Try COM object approach for more detailed update info
+        try {
+            $updateSession = New-Object -ComObject Microsoft.Update.Session
+            $updateSearcher = $updateSession.CreateUpdateSearcher()
+            
+            # Check for pending updates
+            $pendingUpdates = $updateSearcher.Search("IsInstalled=0")
+            
+            # Display Pending Updates
+            if ($pendingUpdates.Updates.Count -gt 0) {
+                Write-ColorOutput "`nPending Updates: $($pendingUpdates.Updates.Count)" "Yellow"
+                
+                $count = 1
+                foreach ($update in $pendingUpdates.Updates) {
+                    Write-ColorOutput "$count. $($update.Title)" "White"
+                    $count++
+                    
+                    # Limit to top 5 to avoid flooding console
+                    if ($count -gt 5 -and $pendingUpdates.Updates.Count -gt 5) {
+                        Write-ColorOutput "   (and $($pendingUpdates.Updates.Count - 5) more...)" "Gray"
+                        break
+                    }
+                }
+            }
+            else {
+                Write-ColorOutput "`nNo pending Windows updates found." "Green"
+            }
+        }
+        catch {
+            Write-ColorOutput "Limited Windows Update information available: $_" "Yellow"
+        }
     }
-    else {
-        Write-Log "+ Memory Usage: $($memoryUsage.PercentUsed)% (Normal)" -ForegroundColor Green
-    }
-    
-    # CPU check
-    if ($cpuUsage.AverageCPU -gt 90) {
-        Write-Log "! HIGH CPU USAGE: $($cpuUsage.AverageCPU)% average CPU utilization" -ForegroundColor Red
-    }
-    else {
-        Write-Log "+ CPU Usage: $($cpuUsage.AverageCPU)% average (Normal)" -ForegroundColor Green
-    }
-    
-    # Network check
-    $failedConnections = $networkStatus | Where-Object { $_.Success -eq $false }
-    if ($failedConnections) {
-        $hostList = ($failedConnections | ForEach-Object { $_.Target }) -join ", "
-        Write-Log "! NETWORK ISSUES: Failed to connect to: $hostList" -ForegroundColor Red
-    }
-    else {
-        Write-Log "+ Network Connectivity: All tested hosts are reachable" -ForegroundColor Green
-    }
-    
-    # Port check
-    if ($portStatus.EstablishedConnections -gt 16000) {
-        Write-Log "! PORT EXHAUSTION RISK: $($portStatus.EstablishedConnections) established connections" -ForegroundColor Red
-    }
-    else {
-        Write-Log "+ TCP Connections: $($portStatus.EstablishedConnections) established connections (Normal)" -ForegroundColor Green
-    }
-    
-    # Service check
-    $stoppedServices = $servicesStatus | Where-Object { $_.Status -ne "Running" }
-    if ($stoppedServices) {
-        $serviceList = ($stoppedServices | ForEach-Object { $_.DisplayName }) -join ", "
-        Write-Log "! CRITICAL SERVICES STOPPED: $serviceList" -ForegroundColor Red
-    }
-    else {
-        Write-Log "+ Services: All critical services are running" -ForegroundColor Green
-    }
-    
-    Write-Log "`nSystem Check Complete!" -ForegroundColor Cyan
-    if ($LogToFile) {
-        Write-Log "Results saved to: $logFilePath" -ForegroundColor Cyan
+    catch {
+        Write-ColorOutput "Error checking Windows Update status: $_" "Red"
     }
 }
 
 function Show-Help {
-    Write-Log "`n===== HELP =====" -ForegroundColor Magenta
-    Write-Log "This script performs various system health checks to diagnose performance issues." -ForegroundColor White
-    Write-Log "`nAvailable Command-line Parameters:" -ForegroundColor Cyan
-    Write-Log "  -LogToFile      Saves results to a log file" -ForegroundColor White
-    Write-Log "  -LogPath        Specifies custom log directory (default: Documents\PCHealthChecks)" -ForegroundColor White
-    Write-Log "  -Silent         Suppresses console output (only applicable with -LogToFile)" -ForegroundColor White
-    Write-Log "`nExample Usage:" -ForegroundColor Cyan
-    Write-Log "  .\PCHealthCheck.ps1 -LogToFile" -ForegroundColor White
-    Write-Log "  .\PCHealthCheck.ps1 -LogToFile -LogPath 'C:\Logs'" -ForegroundColor White
-    Write-Log "  .\PCHealthCheck.ps1 -LogToFile -Silent" -ForegroundColor White
-    Write-Log "`nPress any key to return to the menu..." -ForegroundColor Yellow
+    Write-ColorOutput "`n===== HELP =====" "Magenta"
+    Write-ColorOutput "This script performs various system health checks to diagnose performance issues." "White"
+    Write-ColorOutput "`nAvailable Command-line Parameters:" "Cyan"
+    Write-ColorOutput "  -LogToFile      Saves results to a log file" "White"
+    Write-ColorOutput "  -LogPath        Specifies custom log directory (default: Documents\PCHealthChecks)" "White"
+    Write-ColorOutput "  -Silent         Suppresses console output (only applicable with -LogToFile)" "White"
+    Write-ColorOutput "`nExample Usage:" "Cyan"
+    Write-ColorOutput "  .\PCHealthCheck.ps1 -LogToFile" "White"
+    Write-ColorOutput "  .\PCHealthCheck.ps1 -LogToFile -LogPath 'C:\Logs'" "White"
+    Write-ColorOutput "  .\PCHealthCheck.ps1 -LogToFile -Silent" "White"
+    Write-ColorOutput "`nPress any key to return to the menu..." "Yellow"
     $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown") | Out-Null
+}
+
+function Show-LogFiles {
+    Write-ColorOutput "`nAvailable Log Files:" "Yellow"
+    
+    try {
+        if (Test-Path -Path $logFilePath) {
+            $logs = Get-ChildItem -Path $logFilePath -Filter "PCHealthCheck_*.log" | 
+                    Sort-Object -Property LastWriteTime -Descending
+            
+            if ($logs.Count -gt 0) {
+                $counter = 1
+                foreach ($log in $logs) {
+                    Write-Host "$counter. $($log.Name) - $($log.LastWriteTime)" -ForegroundColor White
+                    $counter++
+                    
+                    # Limit to top 10 to avoid flooding console
+                    if ($counter -gt 10 -and $logs.Count -gt 10) {
+                        Write-Host "   (and $($logs.Count - 10) more...)" -ForegroundColor Gray
+                        break
+                    }
+                }
+                
+                Write-ColorOutput "`nLog location: $logFilePath" "Cyan"
+            }
+            else {
+                Write-ColorOutput "No log files found." "Yellow"
+            }
+        }
+        else {
+            Write-ColorOutput "Log directory does not exist yet. Run some checks first." "Yellow"
+        }
+    }
+    catch {
+        Write-ColorOutput "Error listing log files: $_" "Red"
+    }
+}
+
+function Run-AllChecks {
+    Write-ColorOutput "`n===== Running All System Checks =====" "Cyan"
+    
+    # Run all check functions
+    Get-DiskSpace
+    Get-MemoryUsage
+    Get-CPUUsage
+    Test-NetworkConnectivity
+    Test-PortExhaustion
+    Get-SystemUptime
+    Get-ServicesStatus
+    Get-EventLogErrors
+    Get-WindowsUpdateStatus
+    
+    Write-ColorOutput "`nSystem Check Complete!" "Cyan"
+    Write-ColorOutput "Results saved to: $logFile" "Cyan"
 }
 
 # Main program
 Show-Banner
-
-if ($LogToFile) {
-    Write-Log "Logging enabled. Log will be saved to: $logFilePath" -ForegroundColor Green
-}
 
 $exitRequested = $false
 
@@ -510,21 +485,22 @@ while (-not $exitRequested) {
         "7" { Get-TopProcessesByMemory }
         "8" { Get-TopProcessesByCPU }
         "9" { Get-ServicesStatus }
-        "10" { Run-AllChecks }
+        "10" { Get-EventLogErrors }
+        "11" { Get-WindowsUpdateStatus }
+        "12" { Run-AllChecks }
         "H" { Show-Help }
+        "L" { Show-LogFiles }
         "Q" { 
-            Write-Log "Exiting script..." -ForegroundColor Cyan
-            if ($LogToFile) {
-                Write-Log "Log saved to: $logFilePath" -ForegroundColor Green
-            }
+            Write-ColorOutput "Exiting script..." "Cyan"
             $exitRequested = $true 
         }
-        default { Write-Log "Invalid choice. Please try again." -ForegroundColor Red }
+        default { Write-ColorOutput "Invalid choice. Please try again." "Red" }
     }
     
     if (-not $exitRequested) {
-        Write-Log "`nPress any key to continue..." -ForegroundColor Yellow
-        $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown") | Out-Null
+        Write-ColorOutput "`nPress any key to continue..." "Yellow"
+        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
         Clear-Host
+        Show-Banner
     }
 }
