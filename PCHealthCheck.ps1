@@ -121,13 +121,13 @@ if ($ExportHTML) {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
             padding: 20px;
-            background-color: #f5f5f5;
+            background-color: #f0f0f0;
             color: #333;
         }
         .container {
             max-width: 1000px;
             margin: 0 auto;
-            background-color: white;
+            background-color: #f8f8f8;
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
@@ -140,9 +140,10 @@ if ($ExportHTML) {
         h2 {
             color: #0066cc;
             margin-top: 25px;
+            font-weight: bold;
         }
         .report-meta {
-            background-color: #f0f7ff;
+            background-color: #e8f0f8;
             padding: 10px;
             border-radius: 5px;
             margin-bottom: 20px;
@@ -175,10 +176,11 @@ if ($ExportHTML) {
             border-bottom: 1px solid #ddd;
         }
         th {
-            background-color: #f2f2f2;
+            background-color: #e8f0f8;
+            font-weight: bold;
         }
         tr:hover {
-            background-color: #f5f5f5;
+            background-color: #f1f1f1;
         }
     </style>
 </head>
